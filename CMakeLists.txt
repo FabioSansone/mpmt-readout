@@ -11,8 +11,10 @@ add_executable(${PROJECT_NAME} ${SRC_FILES})
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-find_package(ZeroMQ REQUIRED)
-target_link_libraries(${PROJECT_NAME} PUBLIC zmq)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ZMQ REQUIRED IMPORTED_TARGET libzmq)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::ZMQ)
 
 find_package(cppzmq REQUIRED)
 
