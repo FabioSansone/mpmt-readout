@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <queue>
+#include <cstddef>
 
 // Thread-safe queue
 template <typename T>
@@ -22,11 +23,14 @@ private:
 
 public:
    // Pushes an element to the queue
-   void push(T item)
+   bool push(T item)
    {
 
       // Acquire lock
-      std::unique_lock<std::mutex> lock(m_mutex);
+      std::lock_guard<std::mutex> lock(m_mutex);
+
+      if (!keep_running)
+         return false;
 
       // Add item
       m_queue.push(item);
@@ -34,10 +38,12 @@ public:
       // Notify one thread that
       // is waiting
       m_cond.notify_one();
+
+      return true;
    }
 
    // Pops an element off the queue
-   T pop()
+   bool pop(T& item)
    {
 
       // acquire lock
@@ -47,17 +53,40 @@ public:
       m_cond.wait(lock,
               [this]() { return (!m_queue.empty() || !keep_running); });
 
+      if (!keep_running)
+         return false;
+
       // retrieve item
-      T item = m_queue.front();
+      item = m_queue.front();
       m_queue.pop();
 
       // return item
-      return item;
+      return true;
    }
 
-   int size() { return m_queue.size(); }
+   std::size_t size() { 
+      std::lock_guard<std::mutex> lock(m_mutex);
+      return m_queue.size(); 
+   }
 
-   void stop() { keep_running = false; m_cond.notify_all(); }
+   void stop() { 
+      {
+         std::lock_guard<std::mutex> lock(m_mutex);
+         keep_running = false; 
+         
+      }  
+
+      m_cond.notify_all(); 
+   }
+
+
+   void reset() {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      std::queue<T> empty;
+      m_queue.swap(empty);
+
+      keep_running = true;
+   }
 };
 
 #if 0
@@ -65,19 +94,25 @@ public:
 // Driver code
 int main()
 {
-   TSQueue<int> q;
+    TSQueue<int> q;
 
-   // Push some data
-   q.push(1);
-   q.push(2);
-   q.push(3);
+    q.push(1);
+    q.push(2);
+    q.push(3);
 
-   // Pop some data
-   std::cout << q.pop() << std::endl;
-   std::cout << q.pop() << std::endl;
-   std::cout << q.pop() << std::endl;
+    int valore = 0;
 
-   return 0;
+    for (int i = 0; i < 3; ++i) {
+        if (q.pop(valore))
+            std::cout << valore << '\n';
+    }
+
+    q.stop();
+
+    if (!q.pop(valore))
+        std::cout << "Coda fermata\n";
+
+    return 0;
 }
 
 #endif
